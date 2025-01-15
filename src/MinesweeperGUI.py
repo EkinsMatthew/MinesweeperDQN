@@ -23,7 +23,7 @@ class MinesweeperGUI:
         self.scale_factor = self.TILE_SIZE * self.zoom_factor
         self.FPS = FPS
 
-        self.tile_image = pygame.image.load("./tiles.png")
+        self.tile_image = pygame.image.load("../assets/tiles.png")
         self.tile_offset = 48 * tile_set_number
 
         self.update_set: list[tuple[int, int]] = []
