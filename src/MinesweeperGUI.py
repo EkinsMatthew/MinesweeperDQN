@@ -19,18 +19,13 @@ class MinesweeperGUI:
         self.game = game
 
         self.TILE_SIZE = 16
+
         self.LEFT_BUFFER = 10
         self.RIGHT_BUFFER = 10
         self.TOP_BUFFER = 52
         self.BOTTOM_BUFFER = 10
 
-        self.zoom_factor = zoom_factor
-
-        self.tile_width = self.TILE_SIZE * self.zoom_factor
-        self.left_offset = self.LEFT_BUFFER * self.zoom_factor
-        self.right_offset = self.RIGHT_BUFFER * self.zoom_factor
-        self.top_offset = self.TOP_BUFFER * self.zoom_factor
-        self.bottom_offset = self.BOTTOM_BUFFER * self.zoom_factor
+        self.scale_factor = zoom_factor
 
         self.FPS = FPS
 
@@ -55,14 +50,51 @@ class MinesweeperGUI:
         self.__start_clock()
 
     def __initialize_window(self):
+        # Calc the size of the window for the game in native coodinates
         self.window_size = (
-            self.game.x * self.tile_width + self.left_offset + self.right_offset,
-            self.game.y * self.tile_width + self.top_offset + self.bottom_offset,
+            self.LEFT_BUFFER + self.game.x * self.TILE_SIZE + self.RIGHT_BUFFER,
+            self.TOP_BUFFER + self.game.y * self.TILE_SIZE + self.BOTTOM_BUFFER,
         )
 
-        self.screen = pygame.display.set_mode(self.window_size)
+        # Convert the window size to real pixels based on the zoom factor
+        self.window_size_real = tuple(x * self.scale_factor for x in self.window_size)
+
+        # Create the screen that the game works off of
+        self.screen = pygame.display.set_mode(self.window_size_real)
+
+        self.__build_ui_frame()
 
         self.refresh()
+
+    def __build_ui_frame(self) -> None:
+        # Create the general UI elements
+        ui_surface = pygame.Surface(self.window_size)
+
+        # The default color of the surface
+        ui_surface.fill(pygame.Color("#444444"))
+
+        self.__draw_rects(
+            ui_surface,
+            "#FFFFFF",
+            [
+                (1, 1, 2, self.window_size[1] - 4),
+                (1, 1, self.window_size[0] - 4, 2),
+            ],
+        )
+
+        self.__draw_rects(
+            ui_surface,
+            "#7B7B7B",
+            [
+                (self.window_size[0] - 3, 3, 2, self.window_size[1] - 4),
+                (3, self.window_size[1] - 3, self.window_size[0] - 4, 2),
+            ],
+        )
+
+        self.screen.blit(
+            pygame.transform.scale_by(ui_surface, self.scale_factor),
+            self.__native_to_drawn_coordinates((0, 0)),
+        )
 
     def __update_board(self):
         tile_map = pygame.Surface(
@@ -86,9 +118,14 @@ class MinesweeperGUI:
                         art_coord[1] + self.TILE_SIZE + self.tile_offset,
                     ),
                 )
-        board = pygame.transform.scale_by(tile_map, self.zoom_factor)
+        board = pygame.transform.scale_by(tile_map, self.scale_factor)
 
-        self.screen.blit(source=board, dest=(self.left_offset, self.top_offset))
+        self.screen.blit(
+            source=board,
+            dest=self.__native_to_drawn_coordinates(
+                (self.LEFT_BUFFER, self.TOP_BUFFER)
+            ),
+        )
 
     def __update_tiles(self, update_list: list[tuple[int, int]]):
         for tile_coord in update_list:
@@ -112,13 +149,15 @@ class MinesweeperGUI:
                 ),
             )
 
-            tile = pygame.transform.scale_by(tile, self.zoom_factor)
+            tile = pygame.transform.scale_by(tile, self.scale_factor)
 
             self.screen.blit(
                 source=tile,
-                dest=(
-                    (x * self.tile_width) + self.left_offset,
-                    (y * self.tile_width) + self.top_offset,
+                dest=self.__native_to_drawn_coordinates(
+                    (
+                        (x * self.TILE_SIZE) + self.LEFT_BUFFER,
+                        (y * self.TILE_SIZE) + self.TOP_BUFFER,
+                    )
                 ),
             )
 
@@ -139,11 +178,11 @@ class MinesweeperGUI:
             else:
                 mouse_presses = pygame.mouse.get_pressed(3)
                 # The current location of the mouse
-                mouse_loc = pygame.mouse.get_pos()
+                mouse_loc = self.__drawn_to_native_coordinates(pygame.mouse.get_pos())
 
                 normalized_coords = [
-                    math.floor((mouse_loc[0] - self.left_offset) / self.tile_width),
-                    math.floor((mouse_loc[1] - self.top_offset) / self.tile_width),
+                    math.floor((mouse_loc[0] - self.LEFT_BUFFER) // self.TILE_SIZE),
+                    math.floor((mouse_loc[1] - self.TOP_BUFFER) // self.TILE_SIZE),
                 ]
 
                 action_on_board = (
@@ -193,6 +232,16 @@ class MinesweeperGUI:
             self.refresh()
 
         return action_this_tick
+
+    def __native_to_drawn_coordinates(
+        self, native_coordinate: tuple[int, int]
+    ) -> tuple[int, int]:
+        return tuple(x * self.scale_factor for x in native_coordinate)
+
+    def __drawn_to_native_coordinates(
+        self, drawn_coordinate: tuple[int, int]
+    ) -> tuple[int, int]:
+        return tuple(x // self.scale_factor for x in drawn_coordinate)
 
     def refresh(
         self,
@@ -261,6 +310,15 @@ class MinesweeperGUI:
     #         else:
     #             number: int = self.game.numbers[x, y]  # type:ignore
     #             return (number % 5, int(number / 5))
+
+    @staticmethod
+    def __draw_rects(
+        surface: pygame.Surface,
+        color: str,
+        rects: list[tuple[int, int, int, int]],
+    ) -> None:
+        for rect in rects:
+            pygame.draw.rect(surface, pygame.Color(color), rect)
 
 
 def main():
