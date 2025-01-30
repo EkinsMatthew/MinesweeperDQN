@@ -1,7 +1,7 @@
 import pygame
+import math
 
 from Minesweeper import Minesweeper
-import torch
 
 import typing
 
@@ -19,12 +19,31 @@ class MinesweeperGUI:
         self.game = game
 
         self.TILE_SIZE = 16
+        self.LEFT_BUFFER = 10
+        self.RIGHT_BUFFER = 10
+        self.TOP_BUFFER = 52
+        self.BOTTOM_BUFFER = 10
+
         self.zoom_factor = zoom_factor
-        self.scale_factor = self.TILE_SIZE * self.zoom_factor
+
+        self.tile_width = self.TILE_SIZE * self.zoom_factor
+        self.left_offset = self.LEFT_BUFFER * self.zoom_factor
+        self.right_offset = self.RIGHT_BUFFER * self.zoom_factor
+        self.top_offset = self.TOP_BUFFER * self.zoom_factor
+        self.bottom_offset = self.BOTTOM_BUFFER * self.zoom_factor
+
         self.FPS = FPS
 
-        self.tile_image = pygame.image.load("../assets/tiles.png")
+        assets_folder = "../assets"
+
+        self.tile_image = pygame.image.load(f"{assets_folder}/tiles.png")
         self.tile_offset = 48 * tile_set_number
+
+        self.smile_image = pygame.image.load(f"{assets_folder}/smiles.png")
+        self.smile_frame = pygame.image.load(f"{assets_folder}/smile_frame.png")
+
+        self.number_image = pygame.image.load(f"{assets_folder}/numbers.png")
+        self.number_frame = pygame.image.load(f"{assets_folder}/number_frame.png")
 
         self.update_set: list[tuple[int, int]] = []
         for y in range(self.game.y):
@@ -37,8 +56,8 @@ class MinesweeperGUI:
 
     def __initialize_window(self):
         self.window_size = (
-            self.game.x * self.scale_factor,
-            self.game.y * self.scale_factor,
+            self.game.x * self.tile_width + self.left_offset + self.right_offset,
+            self.game.y * self.tile_width + self.top_offset + self.bottom_offset,
         )
 
         self.screen = pygame.display.set_mode(self.window_size)
@@ -67,7 +86,9 @@ class MinesweeperGUI:
                         art_coord[1] + self.TILE_SIZE + self.tile_offset,
                     ),
                 )
-        pygame.transform.scale_by(tile_map, self.zoom_factor, self.screen)
+        board = pygame.transform.scale_by(tile_map, self.zoom_factor)
+
+        self.screen.blit(source=board, dest=(self.left_offset, self.top_offset))
 
     def __update_tiles(self, update_list: list[tuple[int, int]]):
         for tile_coord in update_list:
@@ -95,7 +116,10 @@ class MinesweeperGUI:
 
             self.screen.blit(
                 source=tile,
-                dest=(x * self.scale_factor, y * self.scale_factor),
+                dest=(
+                    (x * self.tile_width) + self.left_offset,
+                    (y * self.tile_width) + self.top_offset,
+                ),
             )
 
     def __start_clock(self) -> None:
@@ -116,17 +140,29 @@ class MinesweeperGUI:
                 mouse_presses = pygame.mouse.get_pressed(3)
                 # The current location of the mouse
                 mouse_loc = pygame.mouse.get_pos()
-                normalized_coords = [int(x / self.scale_factor) for x in mouse_loc]
 
-                if mouse_presses[0]:
-                    action_this_tick = self.game.discover_tile(
-                        normalized_coords[0], normalized_coords[1]
-                    )
+                normalized_coords = [
+                    math.floor((mouse_loc[0] - self.left_offset) / self.tile_width),
+                    math.floor((mouse_loc[1] - self.top_offset) / self.tile_width),
+                ]
 
-                if mouse_presses[2]:
-                    action_this_tick = self.game.flag_tile(
-                        normalized_coords[0], normalized_coords[1]
-                    )
+                action_on_board = (
+                    (0 <= normalized_coords[0])
+                    and (normalized_coords[0] < self.game.x)
+                    and (0 <= normalized_coords[1])
+                    and (normalized_coords[1] < self.game.y)
+                )
+
+                if action_on_board:
+                    if mouse_presses[0]:
+                        action_this_tick = self.game.discover_tile(
+                            normalized_coords[0], normalized_coords[1]
+                        )
+
+                    if mouse_presses[2]:
+                        action_this_tick = self.game.flag_tile(
+                            normalized_coords[0], normalized_coords[1]
+                        )
 
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_SPACE:
@@ -134,7 +170,7 @@ class MinesweeperGUI:
                             self.game.reinitialize_game_state()
                             action_this_tick = False
                             self.refresh()
-                        else:
+                        elif action_on_board:
                             discovered = self.game.discovery[
                                 normalized_coords[0], normalized_coords[1]
                             ]
@@ -158,7 +194,10 @@ class MinesweeperGUI:
 
         return action_this_tick
 
-    def refresh(self, extra_context: typing.Optional[str] = None, ) -> None:
+    def refresh(
+        self,
+        extra_context: typing.Optional[str] = None,
+    ) -> None:
         if (len(self.game.update_list) == 0) | (self.game.over):
             self.__update_board()
         else:
@@ -173,6 +212,7 @@ class MinesweeperGUI:
             + f" // Mines: {self.game.num_mines - self.game.num_flags}"
             + f" // Over: {self.game.over}"
             + f" // Won: {self.game.over and not self.game.lost}"
+            + f" // MouseLoc: {mouse_loc}"
         )
 
         # Update the display
@@ -226,15 +266,14 @@ class MinesweeperGUI:
 def main():
     ms = Minesweeper()
 
-    ms.initialize_game_state(16, 16, 40)
+    ms.initialize_game_state(9, 9, 10)
 
     # print(ms.numbers)
     # print(ms.mines)
 
     gui = MinesweeperGUI(
         ms,
-        zoom_factor=4,
-    
+        zoom_factor=5,
         FPS=1000,
         tile_set_number=2,
     )
