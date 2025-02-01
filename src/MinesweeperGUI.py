@@ -58,10 +58,10 @@ class MinesweeperGUI:
             self.field_y_buffers[0] + self.field_size[1] + self.field_y_buffers[1],
         )
 
-        # self.ui_x_buffers = (3, 3)
-        # self.ui_y_buffers = (42, 3)
-        self.ui_x_buffers = (0, 0)
-        self.ui_y_buffers = (0, 0)
+        self.ui_x_buffers = (3, 3)
+        self.ui_y_buffers = (42, 3)
+        # self.ui_x_buffers = (0, 0)
+        # self.ui_y_buffers = (0, 0)
 
         self.x_buffers = tuple(
             x1 + x2 for x1, x2 in zip(self.field_x_buffers, self.ui_x_buffers)
@@ -419,14 +419,14 @@ class MinesweeperGUI:
 def main():
     ms = Minesweeper()
 
-    ms.initialize_game_state(9, 9, 10)
+    ms.initialize_game_state(30, 16, 99)
 
     # print(ms.numbers)
     # print(ms.mines)
 
     gui = MinesweeperGUI(
         ms,
-        zoom_factor=5,
+        zoom_factor=3,
         FPS=1000,
         tile_set_number=2,
     )
