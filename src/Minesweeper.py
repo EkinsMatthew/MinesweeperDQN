@@ -43,7 +43,8 @@ class Minesweeper:
         Raises
         ------
         ValueError
-            If the board shape is illegal or if the number of mines exceeds the number of tiles
+            If the board shape is illegal or if the number of mines exceeds the 
+            number of tiles
         ValueError
             _description_
         """
@@ -234,9 +235,9 @@ class Minesweeper:
         self.board = torch.where(self.discovery == 1, self.numbers, self.board)
 
     def update_game_board(self) -> None:
-        """At the current step, with all accumulated changes to the board, perform
-        the appropriate changes. In practice this means that we will add the
-        delta or derivative tensor to the game board.
+        """At the current step, with all accumulated changes to the board, 
+        perform the appropriate changes. In practice this means that we will add 
+        the delta or derivative tensor to the game board.
         """
         # print(self.derivative.transpose(0, 1))
         self.board += self.derivative
@@ -325,8 +326,8 @@ class Minesweeper:
         Returns
         -------
         bool
-            True if the tile was successfully discovered, False if for any reason
-            that tile could not be discovered
+            True if the tile was successfully discovered, False if for any 
+            reason that tile could not be discovered
         """
         if self.over:
             return False
@@ -342,8 +343,8 @@ class Minesweeper:
         return result
 
     def __discover_tile_backend(self, x: int, y: int) -> bool:
-        """Private backend for discovering tiles. This method performs all of the
-        logic the tile discovery, but none of the updates to the game board.
+        """Private backend for discovering tiles. This method performs all of 
+        the logic the tile discovery, but none of the updates to the game board.
 
         Parameters
         ----------
@@ -355,8 +356,8 @@ class Minesweeper:
         Returns
         -------
         bool
-            True if the tile was successfully discovered, False if for any reason
-            that tile could not be discovered
+            True if the tile was successfully discovered, False if for any 
+            reason that tile could not be discovered
         """
 
         # First check if the is flagged
@@ -449,8 +450,8 @@ class Minesweeper:
         return result
 
     def __test_number_tile_backend(self, x: int, y: int) -> bool:
-        """Perform the logical backend of the updates for number tile testing. Two
-        criteria must be met in order for this method to return True:
+        """Perform the logical backend of the updates for number tile testing. 
+        Two criteria must be met in order for this method to return True:
 
         1) The passed tile must have a number of flags in its legal neighbor set
         equal to the number shown on its face
@@ -495,7 +496,8 @@ class Minesweeper:
         return False
 
     def flag_tile(self, x: int, y: int) -> bool:
-        """Method for placing or removing a flag on the tile specified by the user
+        """Method for placing or removing a flag on the tile specified by the 
+        user
 
         Parameters
         ----------

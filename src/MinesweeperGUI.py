@@ -58,10 +58,10 @@ class MinesweeperGUI:
             self.field_y_buffers[0] + self.field_size[1] + self.field_y_buffers[1],
         )
 
-        self.ui_x_buffers = (3, 3)
-        self.ui_y_buffers = (42, 3)
-        # self.ui_x_buffers = (0, 0)
-        # self.ui_y_buffers = (0, 0)
+        # self.ui_x_buffers = (3, 3)
+        # self.ui_y_buffers = (42, 3)
+        self.ui_x_buffers = (0, 0)
+        self.ui_y_buffers = (0, 0)
 
         self.x_buffers = tuple(
             x1 + x2 for x1, x2 in zip(self.field_x_buffers, self.ui_x_buffers)
@@ -97,12 +97,12 @@ class MinesweeperGUI:
         frame_width = 2
 
         ui_frame = (
-            tuple(x + 1 for x in (0, 0)),
+            (1, 1),
             tuple(x - 3 for x in self.ui_size),
         )
         info_frame = (
-            tuple(x + 9 for x in (0, 0)),
-            (self.ui_size[0] - 11, 43),
+            (9, 9),
+            (self.ui_size[0] - (9 + frame_width), 43),
         )
         field_frame = (
             (
@@ -134,6 +134,61 @@ class MinesweeperGUI:
         self.__draw_frame(self.ui_surface, info_frame, 2, "#7B7B7B", "#FFFFFF", 1)
 
         self.__draw_frame(self.ui_surface, field_frame, 2, "#7B7B7B", "#FFFFFF", 1)
+
+        # Place number and smile frames
+
+        info_frame_width = info_frame[1][0] - info_frame[0][0]
+
+        number_frame_size = self.number_frame.get_size()
+        mine_counter_loc = (0, 0)
+        timer_loc = (0, 0)
+
+        smile_frame_size = self.smile_frame.get_size()
+        smile_frame_loc = (0, 0)
+
+        min_full_feature_width = (
+            # Two counters
+            2 * number_frame_size[0]
+            # One smiley
+            + smile_frame_size[0]
+            # 6 pixel buffer for three elements is 4 (fence post)
+            + 6 * 4
+        )
+
+        if info_frame_width >= min_full_feature_width:
+            mine_counter_loc = (
+                info_frame[0][0] + 6 + frame_width,
+                info_frame[0][1] + 4 + frame_width,
+            )
+            self.ui_surface.blit(self.number_frame, mine_counter_loc)
+
+            timer_loc = (
+                info_frame[1][0] - 6 - number_frame_size[0],
+                info_frame[0][1] + 6,
+            )
+            self.ui_surface.blit(self.number_frame, timer_loc)
+
+            smile_frame_loc = (
+                info_frame[0][0] + (info_frame_width / 2) - (smile_frame_size[0] / 2),
+                info_frame[0][1] + 5,
+            )
+            self.ui_surface.blit(self.smile_frame, smile_frame_loc)
+
+            # Defining the timer location is conditonal on all having space for all three
+            self.timer_loc = (
+                timer_loc[0] + self.ui_x_buffers[0],
+                timer_loc[1] + self.ui_y_buffers[0],
+            )
+
+        self.mine_counter_loc = (
+            mine_counter_loc[0] + self.ui_x_buffers[0],
+            mine_counter_loc[1] + self.ui_y_buffers[0],
+        )
+
+        self.smile_frame_loc = (
+            smile_frame_loc[0] + self.ui_x_buffers[0],
+            smile_frame_loc[1] + self.ui_y_buffers[0],
+        )
 
         self.screen.blit(
             pygame.transform.scale_by(self.ui_surface, self.scale_factor),
@@ -206,6 +261,27 @@ class MinesweeperGUI:
                     )
                 ),
             )
+
+    def __counter_from_number(self, n: int) -> pygame.Surface:
+
+        numbers = MinesweeperGUI.__int_to_three_digit_display(n)
+
+        number_tile_size = (13, 23)
+        counter = pygame.Surface((number_tile_size[0] * 3, number_tile_size[1]))
+
+        for i, number in enumerate(numbers):
+            number_loc = (number % 6, number // 6)
+            counter.blit(
+                self.number_image,
+                (i * number_tile_size[0], 0),
+                (
+                    number_loc[0] * number_tile_size[0],
+                    number_loc[1] * number_tile_size[1],
+                    number_loc[0] * number_tile_size[0] + number_tile_size[0],
+                    number_loc[1] * number_tile_size[1] + number_tile_size[1],
+                ),
+            )
+        return counter
 
     def __start_clock(self) -> None:
         # Our cock for frame rate and update
@@ -380,6 +456,16 @@ class MinesweeperGUI:
             + f" // MouseLoc: {mouse_loc}"
         )
 
+        self.screen.blit(
+            pygame.transform.scale_by(
+                self.__counter_from_number(self.game.num_mines - self.game.num_flags),
+                self.scale_factor,
+            ),
+            self.__native_to_drawn_coordinates(
+                tuple(x + 1 for x in self.mine_counter_loc)
+            ),
+        )
+
         # Update the display
         # if action_this_tick:
         # pygame.display.flip()
@@ -387,24 +473,30 @@ class MinesweeperGUI:
 
         # self.clock.tick(self.FPS)
 
-    def __get_tile_art_coordinate(self, x: int, y: int):
-        art_value = int(self.game.board[x, y])
+    def __get_tile_art_coordinate(self, x: int, y: int) -> tuple[int, int]:
+        # What does the board say is in this square?
+        tile_value = int(self.game.board[x, y])
+
+        # All non-numbers have special case number descriptors
 
         # Incorrectly flagged square
-        if art_value == -5:
+        if tile_value == -5:
             return (3, 2)
         # Lost mine
-        if art_value == -4:
+        if tile_value == -4:
             return (2, 2)
         # All other mines
-        if art_value == -3:
+        if tile_value == -3:
             return (1, 2)
-        if art_value == -2:
+        # Flagged square
+        if tile_value == -2:
             return (4, 1)
-        if art_value == -1:
+        # Undiscovered square
+        if tile_value == -1:
             return (0, 2)
 
-        return (art_value % 5, int(art_value / 5))
+        # All numbers can derive their coordinate from their value
+        return (tile_value % 5, tile_value // 5)
 
     @staticmethod
     def __draw_rects(
@@ -415,11 +507,53 @@ class MinesweeperGUI:
         for rect in rects:
             pygame.draw.rect(surface, pygame.Color(color), rect)
 
+    @staticmethod
+    def __int_to_three_digit_display(number: int) -> tuple[int, int, int]:
+        
+        # NOTE: In this notation, the single digit numbers represent themselves,
+        # the negative symbol is represented by a 10, and the blank display is
+        # represented by 11
+        
+        # Edges of the function
+        if number > 999:
+            return (9, 9, 9)
+        if number < -99:
+            return (11, 9, 9)
+        if number == 0:
+            return (11, 11, 0)
+        
+        # Solution that consumes the number right to left
+        abs_number = abs(number)
+        
+        # Start with a blank display
+        display = [11, 11, 11]
+
+        # Iterate starting on the right
+        i = 2
+        while abs_number != 0:
+            # The number in this spot
+            display[i] = abs_number % 10
+            # Consume the digit
+            abs_number = abs_number // 10
+            # Move once to the left
+            i -= 1
+        
+        # Where to put the negative symbol if the number is below zero
+        if number < 0:
+            # In the middle spot for single digit negatives
+            if number > -10:
+                display[1] = 10
+            # In the first slot for double digit negatives
+            else:
+                display[0] = 10
+        
+        return tuple(display)
+
 
 def main():
     ms = Minesweeper()
 
-    ms.initialize_game_state(30, 16, 99)
+    ms.initialize_game_state(9, 9, 10)
 
     # print(ms.numbers)
     # print(ms.mines)
