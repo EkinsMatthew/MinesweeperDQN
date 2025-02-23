@@ -45,7 +45,7 @@ class Minesweeper:
         Raises
         ------
         ValueError
-            If the board shape is illegal or if the number of mines exceeds the 
+            If the board shape is illegal or if the number of mines exceeds the
             number of tiles
         ValueError
             _description_
@@ -237,8 +237,8 @@ class Minesweeper:
         self.board = torch.where(self.discovery == 1, self.numbers, self.board)
 
     def update_game_board(self) -> None:
-        """At the current step, with all accumulated changes to the board, 
-        perform the appropriate changes. In practice this means that we will add 
+        """At the current step, with all accumulated changes to the board,
+        perform the appropriate changes. In practice this means that we will add
         the delta or derivative tensor to the game board.
         """
         # print(self.derivative.transpose(0, 1))
@@ -328,7 +328,7 @@ class Minesweeper:
         Returns
         -------
         bool
-            True if the tile was successfully discovered, False if for any 
+            True if the tile was successfully discovered, False if for any
             reason that tile could not be discovered
         """
         if self.over:
@@ -345,7 +345,7 @@ class Minesweeper:
         return result
 
     def __discover_tile_backend(self, x: int, y: int) -> bool:
-        """Private backend for discovering tiles. This method performs all of 
+        """Private backend for discovering tiles. This method performs all of
         the logic the tile discovery, but none of the updates to the game board.
 
         Parameters
@@ -358,7 +358,7 @@ class Minesweeper:
         Returns
         -------
         bool
-            True if the tile was successfully discovered, False if for any 
+            True if the tile was successfully discovered, False if for any
             reason that tile could not be discovered
         """
 
@@ -452,7 +452,7 @@ class Minesweeper:
         return result
 
     def __test_number_tile_backend(self, x: int, y: int) -> bool:
-        """Perform the logical backend of the updates for number tile testing. 
+        """Perform the logical backend of the updates for number tile testing.
         Two criteria must be met in order for this method to return True:
 
         1) The passed tile must have a number of flags in its legal neighbor set
@@ -498,7 +498,7 @@ class Minesweeper:
         return False
 
     def flag_tile(self, x: int, y: int) -> bool:
-        """Method for placing or removing a flag on the tile specified by the 
+        """Method for placing or removing a flag on the tile specified by the
         user
 
         Parameters
@@ -542,7 +542,7 @@ class Minesweeper:
         bool
             True if the tile was successfully operated on, False otherwise
         """
-        
+
         # If the square has been discovered, then we can't flag it
         if self.discovery[x, y]:
             return False
@@ -595,6 +595,7 @@ class MinesweeperGUI:
 
         self.tile_image = pygame.image.load(f"{assets_folder}/tiles.png")
         self.tile_offset = 48 * tile_set_number
+        self.TILE_SIZE = 16
 
         self.smile_image = pygame.image.load(f"{assets_folder}/smiles.png")
         self.smile_frame = pygame.image.load(f"{assets_folder}/smile_frame.png")
@@ -609,13 +610,26 @@ class MinesweeperGUI:
             for x in range(self.game.x):
                 self.update_set.append((x, y))
 
+        self.held_left_click_loc: tuple[int, int] = None
+        self.prev_held_left_click_loc: tuple[int, int] = None
+
+        self.clicked_tile_image = pygame.Surface(size=(self.TILE_SIZE, self.TILE_SIZE))
+        self.clicked_tile_image.blit(
+            self.tile_image,
+            (0, 0),
+            (
+                0,
+                0 + self.tile_offset,
+                self.TILE_SIZE,
+                self.TILE_SIZE + self.tile_offset,
+            ),
+        )
+
         self.__initialize_window()
 
         self.__start_clock()
 
     def __initialize_window(self):
-
-        self.TILE_SIZE = 16
 
         self.field_size = (self.game.x * self.TILE_SIZE, self.game.y * self.TILE_SIZE)
 
@@ -852,6 +866,9 @@ class MinesweeperGUI:
             )
         return counter
 
+    def __render_held_left(self) -> None:
+        self
+
     def __start_clock(self) -> None:
         # Our cock for frame rate and update
         self.clock = pygame.time.Clock()
@@ -867,32 +884,72 @@ class MinesweeperGUI:
                 raise SystemExit
             # Check for various key-presses
             else:
-                mouse_presses = pygame.mouse.get_pressed(3)
                 # The current location of the mouse
                 mouse_loc = self.__drawn_to_native_coordinates(pygame.mouse.get_pos())
 
-                normalized_coords = [
-                    math.floor((mouse_loc[0] - self.x_buffers[0]) // self.TILE_SIZE),
-                    math.floor((mouse_loc[1] - self.y_buffers[0]) // self.TILE_SIZE),
-                ]
+                normalized_coordinate = self.__normalize_coordinates(mouse_loc)
 
-                action_on_board = (
-                    (0 <= normalized_coords[0])
-                    and (normalized_coords[0] < self.game.x)
-                    and (0 <= normalized_coords[1])
-                    and (normalized_coords[1] < self.game.y)
-                )
+                mouse_on_board = self.__loc_on_board(mouse_loc)
 
-                if action_on_board:
-                    if mouse_presses[0]:
-                        action_this_tick = self.game.discover_tile(
-                            normalized_coords[0], normalized_coords[1]
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1:
+                        self.held_left_click_loc = mouse_loc
+
+                if self.held_left_click_loc is not None:
+                    if self.held_left_click_loc != mouse_loc:
+                        self.prev_held_left_click_loc = self.held_left_click_loc
+                        self.held_left_click_loc = mouse_loc
+
+                    print(self.prev_held_left_click_loc, self.held_left_click_loc)
+                    if self.prev_held_left_click_loc is not None:
+                        print(
+                            self.__normalize_coordinates(self.prev_held_left_click_loc),
+                            self.__normalize_coordinates(self.held_left_click_loc),
                         )
 
-                    if mouse_presses[2]:
-                        action_this_tick = self.game.flag_tile(
-                            normalized_coords[0], normalized_coords[1]
-                        )
+                    if self.__loc_on_board(self.held_left_click_loc):
+                        x, y = self.__normalize_coordinates(self.held_left_click_loc)
+
+                        if not self.game.discovery[x][y]:
+                            self.screen.blit(
+                                pygame.transform.scale_by(
+                                    self.clicked_tile_image, self.scale_factor
+                                ),
+                                self.__native_to_drawn_coordinates(
+                                    (
+                                        (x * self.TILE_SIZE) + self.x_buffers[0],
+                                        (y * self.TILE_SIZE) + self.y_buffers[0],
+                                    )
+                                ),
+                            )
+
+                    if self.prev_held_left_click_loc is not None:
+                        if self.__loc_on_board(self.prev_held_left_click_loc) & (
+                            self.__normalize_coordinates(self.held_left_click_loc)
+                            != self.__normalize_coordinates(
+                                self.prev_held_left_click_loc
+                            )
+                        ):
+                            self.game.update_list.append(
+                                self.__normalize_coordinates(
+                                    self.prev_held_left_click_loc
+                                )
+                            )
+
+                    self.refresh()
+
+                if event.type == pygame.MOUSEBUTTONUP:
+                    if mouse_on_board:
+                        if event.button == 1:
+                            action_this_tick = self.game.discover_tile(
+                                normalized_coordinate[0], normalized_coordinate[1]
+                            )
+
+                        if event.button == 3:
+                            action_this_tick = self.game.flag_tile(
+                                normalized_coordinate[0], normalized_coordinate[1]
+                            )
+                    self.held_left_click_loc = None
 
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_SPACE:
@@ -900,20 +957,20 @@ class MinesweeperGUI:
                             self.game.reinitialize_game_state()
                             action_this_tick = False
                             self.refresh()
-                        elif action_on_board:
+                        elif mouse_on_board:
                             discovered = self.game.discovery[
-                                normalized_coords[0], normalized_coords[1]
+                                normalized_coordinate[0], normalized_coordinate[1]
                             ]
                             if discovered:
                                 action_this_tick = self.game.test_number_tile(
-                                    normalized_coords[0], normalized_coords[1]
+                                    normalized_coordinate[0], normalized_coordinate[1]
                                 )
                             else:
                                 action_this_tick = self.game.flag_tile(
-                                    normalized_coords[0], normalized_coords[1]
+                                    normalized_coordinate[0], normalized_coordinate[1]
                                 )
 
-                    if event.key == pygame.K_RETURN:
+                    if event.key == pygame.K_ESCAPE:
                         self.game.reinitialize_game_state()
 
                         action_this_tick = False
@@ -933,6 +990,24 @@ class MinesweeperGUI:
         self, drawn_coordinate: tuple[int, int]
     ) -> tuple[int, int]:
         return tuple(x // self.scale_factor for x in drawn_coordinate)
+
+    def __normalize_coordinates(
+        self, native_coordinate: tuple[int, int]
+    ) -> tuple[int, int]:
+        return (
+            math.floor((native_coordinate[0] - self.x_buffers[0]) // self.TILE_SIZE),
+            math.floor((native_coordinate[1] - self.y_buffers[0]) // self.TILE_SIZE),
+        )
+
+    def __loc_on_board(self, native_coordinate: tuple[int, int]) -> bool:
+        normalized_coordinate = self.__normalize_coordinates(native_coordinate)
+
+        return (
+            (0 <= normalized_coordinate[0])
+            and (normalized_coordinate[0] < self.game.x)
+            and (0 <= normalized_coordinate[1])
+            and (normalized_coordinate[1] < self.game.y)
+        )
 
     def __draw_frame(
         self,
@@ -1012,7 +1087,7 @@ class MinesweeperGUI:
             self.__update_board()
         else:
             self.__update_tiles(self.game.update_list)
-        # self.game.clear_update_list()
+        self.game.clear_update_list()
 
         # The current location of the mouse
         mouse_loc = pygame.mouse.get_pos()
@@ -1078,11 +1153,11 @@ class MinesweeperGUI:
 
     @staticmethod
     def __int_to_three_digit_display(number: int) -> tuple[int, int, int]:
-        
+
         # NOTE: In this notation, the single digit numbers represent themselves,
         # the negative symbol is represented by a 10, and the blank display is
         # represented by 11
-        
+
         # Edges of the function
         if number > 999:
             return (9, 9, 9)
@@ -1090,10 +1165,10 @@ class MinesweeperGUI:
             return (11, 9, 9)
         if number == 0:
             return (11, 11, 0)
-        
+
         # Solution that consumes the number right to left
         abs_number = abs(number)
-        
+
         # Start with a blank display
         display = [11, 11, 11]
 
@@ -1106,7 +1181,7 @@ class MinesweeperGUI:
             abs_number = abs_number // 10
             # Move once to the left
             i -= 1
-        
+
         # Where to put the negative symbol if the number is below zero
         if number < 0:
             # In the middle spot for single digit negatives
@@ -1115,7 +1190,7 @@ class MinesweeperGUI:
             # In the first slot for double digit negatives
             else:
                 display[0] = 10
-        
+
         return tuple(display)
 
 
@@ -1129,7 +1204,7 @@ def main():
 
     gui = MinesweeperGUI(
         ms,
-        zoom_factor=3,
+        zoom_factor=6,
         FPS=1000,
         tile_set_number=2,
     )
