@@ -2,8 +2,23 @@ import torch
 import random
 import typing
 import sys
-import pygame
 import math
+
+# All of this code just to make pygame shut the fuck up on import! Very cool!
+
+import warnings
+
+warnings.simplefilter("ignore")
+
+from contextlib import redirect_stdout
+from io import StringIO
+
+with redirect_stdout(StringIO()):
+    import pygame
+
+warnings.simplefilter("default")
+
+# End asinine pygame handling
 
 
 class Minesweeper:
@@ -45,7 +60,7 @@ class Minesweeper:
         Raises
         ------
         ValueError
-            If the board shape is illegal or if the number of mines exceeds the 
+            If the board shape is illegal or if the number of mines exceeds the
             number of tiles
         ValueError
             _description_
@@ -237,8 +252,8 @@ class Minesweeper:
         self.board = torch.where(self.discovery == 1, self.numbers, self.board)
 
     def update_game_board(self) -> None:
-        """At the current step, with all accumulated changes to the board, 
-        perform the appropriate changes. In practice this means that we will add 
+        """At the current step, with all accumulated changes to the board,
+        perform the appropriate changes. In practice this means that we will add
         the delta or derivative tensor to the game board.
         """
         # print(self.derivative.transpose(0, 1))
@@ -328,7 +343,7 @@ class Minesweeper:
         Returns
         -------
         bool
-            True if the tile was successfully discovered, False if for any 
+            True if the tile was successfully discovered, False if for any
             reason that tile could not be discovered
         """
         if self.over:
@@ -345,7 +360,7 @@ class Minesweeper:
         return result
 
     def __discover_tile_backend(self, x: int, y: int) -> bool:
-        """Private backend for discovering tiles. This method performs all of 
+        """Private backend for discovering tiles. This method performs all of
         the logic the tile discovery, but none of the updates to the game board.
 
         Parameters
@@ -358,7 +373,7 @@ class Minesweeper:
         Returns
         -------
         bool
-            True if the tile was successfully discovered, False if for any 
+            True if the tile was successfully discovered, False if for any
             reason that tile could not be discovered
         """
 
@@ -452,7 +467,7 @@ class Minesweeper:
         return result
 
     def __test_number_tile_backend(self, x: int, y: int) -> bool:
-        """Perform the logical backend of the updates for number tile testing. 
+        """Perform the logical backend of the updates for number tile testing.
         Two criteria must be met in order for this method to return True:
 
         1) The passed tile must have a number of flags in its legal neighbor set
@@ -498,7 +513,7 @@ class Minesweeper:
         return False
 
     def flag_tile(self, x: int, y: int) -> bool:
-        """Method for placing or removing a flag on the tile specified by the 
+        """Method for placing or removing a flag on the tile specified by the
         user
 
         Parameters
@@ -542,7 +557,7 @@ class Minesweeper:
         bool
             True if the tile was successfully operated on, False otherwise
         """
-        
+
         # If the square has been discovered, then we can't flag it
         if self.discovery[x, y]:
             return False
@@ -1078,11 +1093,11 @@ class MinesweeperGUI:
 
     @staticmethod
     def __int_to_three_digit_display(number: int) -> tuple[int, int, int]:
-        
+
         # NOTE: In this notation, the single digit numbers represent themselves,
         # the negative symbol is represented by a 10, and the blank display is
         # represented by 11
-        
+
         # Edges of the function
         if number > 999:
             return (9, 9, 9)
@@ -1090,10 +1105,10 @@ class MinesweeperGUI:
             return (11, 9, 9)
         if number == 0:
             return (11, 11, 0)
-        
+
         # Solution that consumes the number right to left
         abs_number = abs(number)
-        
+
         # Start with a blank display
         display = [11, 11, 11]
 
@@ -1106,7 +1121,7 @@ class MinesweeperGUI:
             abs_number = abs_number // 10
             # Move once to the left
             i -= 1
-        
+
         # Where to put the negative symbol if the number is below zero
         if number < 0:
             # In the middle spot for single digit negatives
@@ -1115,21 +1130,97 @@ class MinesweeperGUI:
             # In the first slot for double digit negatives
             else:
                 display[0] = 10
-        
+
         return tuple(display)
 
 
+import argparse
+
+
+# Custom formatter for argparse help functions;
+# https://stackoverflow.com/questions/18275023
+class CustomHelpFormatter(argparse.HelpFormatter):
+    def _format_action_invocation(self, action):
+        if not action.option_strings or action.nargs == 0:
+            return super()._format_action_invocation(action)
+        default = self._get_default_metavar_for_optional(action)
+        args_string = self._format_args(action, default)
+        return ", ".join(action.option_strings) + " " + args_string
+
+
 def main():
+
+    fmt = lambda prog: CustomHelpFormatter(prog)
+    parser = argparse.ArgumentParser(formatter_class=fmt)
+
+    parser.add_argument(
+        "-d",
+        "--difficulty",
+        metavar="d",
+        help="choose an original minesweeper difficulty:"
+        + " B(eginner; 9x9, 10 mines),"
+        + " I(ntermediate; 16x16, 40 mines),"
+        + " E(xpert; 30x16, 99 mines)",
+    )
+    parser.add_argument(
+        "-s",
+        "--size",
+        metavar=("x", "y"),
+        type=int,
+        nargs=2,
+        help="set the size of the board",
+    )
+    parser.add_argument(
+        "-m",
+        "--mines",
+        metavar="m",
+        type=int,
+        help="specify a number of mines",
+    )
+    parser.add_argument(
+        "-z",
+        "--zoom",
+        metavar="factor",
+        default=2,
+        type=int,
+        help="scale factor of game; integer only",
+    )
+
+    args = parser.parse_args()
+
+    if ((args.size is not None) or (args.mines is not None)) and (
+        args.difficulty is not None
+    ):
+        parser.error("argument -d is mututally exclusive with -s and -m")
+
+    if (args.size is None) != (args.mines is None):
+        parser.error("arguments -s and -m must be used together")
+
+    elif args.size is None:
+        if args.difficulty is None:
+            args.difficulty = "B"
+
+        match (args.difficulty):
+            case "B":
+                args.size = [9, 9]
+                args.mines = 10
+            case "I":
+                args.size = [16, 16]
+                args.mines = 40
+            case "E":
+                args.size = [30, 16]
+                args.mines = 99
+
     ms = Minesweeper()
 
-    ms.initialize_game_state(9, 9, 10)
+    ms.initialize_game_state(args.size[0], args.size[1], args.mines)
 
     # print(ms.numbers)
     # print(ms.mines)
 
     gui = MinesweeperGUI(
         ms,
-        zoom_factor=3,
+        zoom_factor=args.zoom,
         FPS=1000,
         tile_set_number=2,
     )
